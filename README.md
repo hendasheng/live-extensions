@@ -4,7 +4,7 @@ Ableton Live 12 扩展工具集。
 
 ## 环境要求
 
-- **Node.js >= 24.14**（推荐 [fnm](https://github.com/Schniz/fnm) 管理版本）
+- **Node.js >= 24.14**
 - **Ableton Live 12 Beta**（Developer Mode 已开启：Preferences → Extensions）
 - **Ableton Extensions SDK**
 - Windows / macOS

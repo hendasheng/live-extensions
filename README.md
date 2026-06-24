@@ -18,7 +18,7 @@ cp .env.example .env   # 按需编辑 Live Beta 路径
 npm start
 ```
 
-> `.env` 已 gitignore，每台机器需要自己复制并配置。SDK 通过本地 tgz 安装，确保 `~/Downloads/` 下有对应的 SDK 文件。
+> `.env` 已 gitignore，每台机器需要自己复制并配置。
 
 在 Live 中右键 MIDI 轨道 → **Video Hit Marker** 即可打开。
 

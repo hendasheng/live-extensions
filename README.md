@@ -6,6 +6,7 @@ Ableton Live 12 扩展工具集。
 
 - **Node.js >= 24.14**（推荐 [fnm](https://github.com/Schniz/fnm) 管理版本）
 - **Ableton Live 12 Beta**（Developer Mode 已开启：Preferences → Extensions）
+- **Ableton Extensions SDK** — 从 [Ableton 开发者网站](https://www.ableton.com/en/developer/) 下载 `extensions-sdk-<version>.zip`，解压后修改 `package.json` 中 `@ableton-extensions/sdk` 和 `@ableton-extensions/cli` 的路径指向对应的 tgz 文件
 - Windows / macOS
 
 ## 快速开始

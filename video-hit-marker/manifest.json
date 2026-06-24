@@ -1,0 +1,7 @@
+{
+  "name": "video-hit-marker",
+  "author": "Video Hit Marker",
+  "version": "0.0.1",
+  "entry": "dist/extension.js",
+  "minimumApiVersion": "1.0.0"
+}

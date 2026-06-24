@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Hit Marker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .header {
+    padding: 10px 16px;
+    background: #252525;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .header h1 { font-size: 15px; font-weight: 600; color: #fff; }
+  .header .hint { font-size: 11px; color: #888; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Player area fills remaining space, centers video */
+  .player-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #252525;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Upload zone — shown when no video */
+  .upload-zone {
+    position: absolute; inset: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #444;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: #6c8cff;
+    background: #1e1e2e;
+  }
+  .upload-zone .inner {
+    text-align: center;
+    color: #888;
+  }
+  .upload-zone .inner svg { margin-bottom: 10px; opacity: 0.5; animation: upload-breathe 1.5s ease-in-out infinite; }
+  @keyframes upload-breathe {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.9; }
+  }
+  .upload-zone .inner p { font-size: 13px; }
+  .upload-zone .inner .sub { font-size: 11px; color: #666; margin-top: 4px; }
+
+  /* Video wrapper — constrains size based on aspect ratio */
+  .video-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    max-height: 100%;
+    background: #252525;
+  }
+  .video-wrapper.portrait {
+    /* tall video: limit height, width follows */
+    height: 100%;
+    max-width: none;
+  }
+  .video-wrapper.landscape {
+    /* wide video: limit width, height follows */
+    width: 100%;
+    max-height: none;
+  }
+
+  video {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    outline: none;
+  }
+
+  /* Change video overlay button */
+  .change-video-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(0,0,0,0.65);
+    color: #ccc;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-family: inherit;
+  }
+  .video-wrapper:hover .change-video-btn { opacity: 1; }
+  .change-video-btn:hover { background: rgba(0,0,0,0.85); color: #fff; }
+
+  /* Drag overlay — shown when dragging over existing video */
+  .drag-overlay {
+    position: absolute; inset: 0;
+    border: 2px dashed #6c8cff;
+    border-radius: 0;
+    background: rgba(30,30,46,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .drag-overlay.active { display: flex; }
+  .drag-overlay span { color: #6c8cff; font-size: 14px; font-weight: 600; }
+
+  .panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: #252525;
+    border-left: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .panel-header .clear-btn {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: inherit;
+  }
+  .panel-header .clear-btn:hover { color: #f44; background: #3a3a3a; }
+  .markers-list {
+    flex: 1;
+    overflow-y: auto;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .markers-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #333;
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .markers-list li .idx { color: #6c8cff; font-weight: 600; margin-right: 6px; }
+  .markers-list li .time { color: #ccc; font-variant-numeric: tabular-nums; }
+  .markers-list li button {
+    background: none; border: none; color: #666; cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 0 3px;
+  }
+  .markers-list li button:hover { color: #f44; }
+  .markers-list .empty { display: block; background: none; color: #555; font-size: 12px; text-align: center; padding: 28px 12px; line-height: 1.7; }
+  .markers-list .empty kbd {
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: inherit;
+    font-size: 10px;
+    color: #aaa;
+  }
+
+  .markers-list::-webkit-scrollbar { width: 5px; }
+  .markers-list::-webkit-scrollbar-track { background: transparent; }
+  .markers-list::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  .markers-list::-webkit-scrollbar-thumb:hover { background: #555; }
+
+  .hint kbd {
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: inherit;
+    font-size: 10px;
+    color: #aaa;
+  }
+  .hint-sep { display: inline-block; width: 12px; }
+
+  .btn {
+    width: 100%;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+  }
+  .btn-primary {
+    background: #6c8cff;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #5a7aee; }
+  .btn-primary:disabled { background: #444; color: #777; cursor: not-allowed; }
+  .timeline-bar {
+    height: 50px;
+    background: #1e1e1e;
+    border-top: 1px solid #333;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .timeline-bar canvas { width: 100%; height: 100%; display: block; }
+
+  .seek-tooltip {
+    position: fixed;
+    background: #333;
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .marker-delete-btn {
+    position: absolute;
+    background: #f44;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    display: none;
+    z-index: 101;
+    padding: 0;
+    transform: translate(-9px, -28px);
+    pointer-events: auto;
+  }
+  .marker-delete-btn:hover { background: #ff6666; }
+
+  input[type="file"] { display: none; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Video Hit Marker</h1>
+  <span class="hint"><kbd>Space</kbd> Play<span class="hint-sep"></span><kbd>T</kbd> Mark</span>
+</div>
+
+<div class="main">
+  <div class="player-area" id="playerArea">
+    <!-- Upload zone: shown when no video -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="inner">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p>Drop video file here</p>
+        <p class="sub">or click to browse</p>
+      </div>
+    </div>
+
+    <!-- Video wrapper: shown when video loaded -->
+    <div class="video-wrapper hidden" id="videoWrapper">
+      <video id="video" controls></video>
+      <button class="change-video-btn" id="changeBtn" title="Change video">Change</button>
+      <div class="drag-overlay" id="dragOverlay"><span>Drop new video</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h3>Markers</h3>
+      <button class="clear-btn" id="clearBtn">Clear all</button>
+    </div>
+    <ul class="markers-list" id="markersList">
+      <li class="empty">Load a video to get started</li>
+    </ul>
+    <button class="btn btn-primary" id="generateBtn" disabled>Generate MIDI</button>
+  </div>
+</div>
+
+<div class="timeline-bar" id="timelineBar">
+  <canvas id="timelineCanvas"></canvas>
+  <button class="marker-delete-btn" id="markerDeleteBtn" title="Delete marker">&#x2715;</button>
+</div>
+
+<div class="seek-tooltip" id="seekTooltip"></div>
+
+<input type="file" id="fileInput" accept="video/*">
+
+<script>
+  const video = document.getElementById("video");
+  const uploadZone = document.getElementById("uploadZone");
+  const videoWrapper = document.getElementById("videoWrapper");
+  const dragOverlay = document.getElementById("dragOverlay");
+  const changeBtn = document.getElementById("changeBtn");
+  const fileInput = document.getElementById("fileInput");
+  const playerArea = document.getElementById("playerArea");
+  const markersList = document.getElementById("markersList");
+  const generateBtn = document.getElementById("generateBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const timelineCanvas = document.getElementById("timelineCanvas");
+  const timelineBar = document.getElementById("timelineBar");
+  const seekTooltip = document.getElementById("seekTooltip");
+  const markerDeleteBtn = document.getElementById("markerDeleteBtn");
+
+  let markers = [];
+  let videoLoaded = false;
+  let hoveredMarkerIdx = -1;
+
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = (seconds % 60).toFixed(3);
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(6, "0")}`;
+  }
+
+  function renderMarkers() {
+    if (markers.length === 0) {
+      const msg = videoLoaded
+        ? 'Press <kbd>T</kbd> to add a marker'
+        : 'Load a video to get started';
+      markersList.innerHTML = `<li class="empty">${msg}</li>`;
+    } else {
+      markersList.innerHTML = markers.map((m, i) =>
+        `<li>
+          <span><span class="idx">#${i + 1}</span><span class="time">${formatTime(m.time)}</span></span>
+          <button data-idx="${i}" title="Delete">&#x2715;</button>
+        </li>`
+      ).join("");
+    }
+    generateBtn.disabled = markers.length === 0;
+    drawTimeline();
+  }
+
+  function addMarker() {
+    if (!video.duration) return;
+    markers.push({ time: video.currentTime });
+    markers.sort((a, b) => a.time - b.time);
+    renderMarkers();
+  }
+
+  function removeMarker(idx) {
+    markers.splice(idx, 1);
+    renderMarkers();
+  }
+
+  markersList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (btn && btn.dataset.idx !== undefined) {
+      removeMarker(parseInt(btn.dataset.idx));
+    }
+  });
+
+  clearBtn.addEventListener("click", () => {
+    markers = [];
+    renderMarkers();
+  });
+
+  // --- Video sizing ---
+  function updateVideoSize() {
+    if (!video.videoWidth || !video.videoHeight) return;
+    const ratio = video.videoWidth / video.videoHeight;
+    videoWrapper.classList.remove("portrait", "landscape");
+    if (ratio >= 1) {
+      videoWrapper.classList.add("landscape");
+    } else {
+      videoWrapper.classList.add("portrait");
+    }
+  }
+
+  video.addEventListener("loadedmetadata", updateVideoSize);
+  window.addEventListener("resize", () => {
+    if (videoLoaded) updateVideoSize();
+    drawTimeline();
+  });
+
+  // --- Video upload (new or replace) ---
+  function openFilePicker() { fileInput.click(); }
+
+  uploadZone.addEventListener("click", openFilePicker);
+  changeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openFilePicker();
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) loadVideo(fileInput.files[0]);
+  });
+
+  function loadVideo(file) {
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    videoWrapper.classList.remove("hidden");
+    uploadZone.classList.add("hidden");
+    videoLoaded = true;
+    markers = [];
+    renderMarkers();
+  }
+
+  // --- Drag & drop (works for both new and replace) ---
+  playerArea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (videoLoaded) dragOverlay.classList.add("active");
+    else uploadZone.classList.add("drag-over");
+  });
+  playerArea.addEventListener("dragleave", () => {
+    dragOverlay.classList.remove("active");
+    uploadZone.classList.remove("drag-over");
+  });
+  playerArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dragOverlay.classList.remove("active");
+    uploadZone.classList.remove("drag-over");
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith("video/")) loadVideo(file);
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    if (!videoLoaded || !video.duration) return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (video.paused) video.play();
+      else video.pause();
+    } else if (e.code === "KeyT") {
+      e.preventDefault();
+      addMarker();
+    } else if (e.code === "ArrowLeft") {
+      e.preventDefault();
+      video.currentTime = Math.max(0, video.currentTime - 1);
+    } else if (e.code === "ArrowRight") {
+      e.preventDefault();
+      video.currentTime = Math.min(video.duration, video.currentTime + 1);
+    }
+  });
+
+  // Timeline
+  function drawTimeline() {
+    const rect = timelineBar.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    timelineCanvas.width = rect.width * dpr;
+    timelineCanvas.height = rect.height * dpr;
+    timelineCanvas.style.width = rect.width + "px";
+    timelineCanvas.style.height = rect.height + "px";
+    const ctx = timelineCanvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const dur = video.duration || 1;
+
+    ctx.fillStyle = "#1e1e1e";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#2a2a2a";
+    ctx.lineWidth = 1;
+    const gridInterval = 10;
+    for (let t = 0; t <= dur; t += gridInterval) {
+      const x = (t / dur) * w;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+
+    ctx.fillStyle = "#555";
+    ctx.font = "10px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    for (let t = 0; t <= dur; t += gridInterval) {
+      ctx.fillText(formatTime(t).slice(0, -1), (t / dur) * w, h - 6);
+    }
+
+    if (video.duration) {
+      const px = (video.currentTime / dur) * w;
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+    }
+
+    for (let i = 0; i < markers.length; i++) {
+      const mx = (markers[i].time / dur) * w;
+      const isHovered = i === hoveredMarkerIdx;
+      const color = isHovered ? "#fff" : "#6c8cff";
+      const s = isHovered ? 7 : 5;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx - s, s * 2); ctx.lineTo(mx + s, s * 2); ctx.closePath(); ctx.fill();
+    }
+  }
+
+  let isScrubbing = false;
+  let scrubMoved = false;
+
+  function seekFromClientX(clientX) {
+    const rect = timelineBar.getBoundingClientRect();
+    const t = ((clientX - rect.left) / rect.width) * video.duration;
+    video.currentTime = Math.max(0, Math.min(video.duration, t));
+  }
+
+  timelineBar.addEventListener("mousedown", (e) => {
+    if (!video.duration) return;
+    isScrubbing = true;
+    scrubMoved = false;
+    seekFromClientX(e.clientX);
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (isScrubbing) {
+      scrubMoved = true;
+      seekFromClientX(e.clientX);
+      markerDeleteBtn.style.display = "none";
+      seekTooltip.style.display = "none";
+      hoveredMarkerIdx = -1;
+    }
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (!isScrubbing) return;
+    isScrubbing = false;
+    if (!scrubMoved && hoveredMarkerIdx !== -1) {
+      removeMarker(hoveredMarkerIdx);
+      hoveredMarkerIdx = -1;
+      markerDeleteBtn.style.display = "none";
+    }
+  });
+
+  function findClosestMarker(mouseX, rect) {
+    if (!markers.length || !video.duration) return -1;
+    const threshold = 10;
+    let closest = -1;
+    let minDist = threshold;
+    for (let i = 0; i < markers.length; i++) {
+      const mx = (markers[i].time / video.duration) * rect.width;
+      const dist = Math.abs(mouseX - rect.left - mx);
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+    return closest;
+  }
+
+  timelineBar.addEventListener("mousemove", (e) => {
+    if (!video.duration || isScrubbing) return;
+    const rect = timelineBar.getBoundingClientRect();
+    const t = ((e.clientX - rect.left) / rect.width) * video.duration;
+    seekTooltip.textContent = formatTime(t).slice(0, -1);
+    seekTooltip.style.display = "block";
+    seekTooltip.style.left = (e.clientX - 30) + "px";
+    seekTooltip.style.top = (rect.top - 26) + "px";
+
+    const idx = findClosestMarker(e.clientX, rect);
+    if (idx !== hoveredMarkerIdx) {
+      hoveredMarkerIdx = idx;
+      if (idx !== -1) {
+        const mx = (markers[idx].time / video.duration) * rect.width + rect.left;
+        markerDeleteBtn.style.left = mx + "px";
+        markerDeleteBtn.style.top = rect.top + "px";
+        markerDeleteBtn.style.display = "block";
+        seekTooltip.style.display = "none";
+      } else {
+        markerDeleteBtn.style.display = "none";
+      }
+    }
+  });
+
+  timelineBar.addEventListener("mouseleave", () => {
+    if (isScrubbing) return;
+    seekTooltip.style.display = "none";
+    markerDeleteBtn.style.display = "none";
+    hoveredMarkerIdx = -1;
+  });
+
+  markerDeleteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (hoveredMarkerIdx !== -1) removeMarker(hoveredMarkerIdx);
+  });
+
+  function tick() { drawTimeline(); requestAnimationFrame(tick); }
+  tick();
+
+  // Send message to Live's WebView host
+  function sendMessage(message) {
+    const isWebKit = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.live;
+    const isWebView2 = window.chrome && window.chrome.webview;
+    if (isWebKit) {
+      window.webkit.messageHandlers.live.postMessage(message);
+    } else if (isWebView2) {
+      window.chrome.webview.postMessage(message);
+    }
+  }
+
+  function closeWithResult(result) {
+    sendMessage({ method: "close_and_send", params: [JSON.stringify(result)] });
+  }
+
+  generateBtn.addEventListener("click", () => {
+    if (markers.length === 0) return;
+    closeWithResult({ markers });
+  });
+</script>
+
+</body>
+</html>

@@ -288,7 +288,7 @@
 <body>
 
 <div class="header">
-  <h1>Video Hit Marker</h1>
+  <h1>Video Hit Marker <span style="font-weight:400;color:#666;font-size:12px">v0.0.1</span></h1>
   <span class="hint"><kbd>Space</kbd> Play<span class="hint-sep"></span><kbd>T</kbd> Mark</span>
 </div>
 
@@ -632,10 +632,28 @@
     sendMessage({ method: "close_and_send", params: [JSON.stringify(result)] });
   }
 
+  function closeWithoutResult() {
+    sendMessage({ method: "close_and_send", params: [""] });
+  }
+
   generateBtn.addEventListener("click", () => {
     if (markers.length === 0) return;
     closeWithResult({ markers });
   });
+
+  // Close via Escape key — discard, don't generate MIDI
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeWithoutResult();
+    }
+  });
+
+  // Close via window chrome — discard, don't generate MIDI
+  window.addEventListener("beforeunload", () => {
+    closeWithoutResult();
+  });
+
 </script>
 
 </body>

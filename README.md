@@ -26,9 +26,9 @@ npm start
 
 视频卡点工具。拖入视频，在关键时刻按 `T` 打点，点击 Generate MIDI 生成对应的 MIDI 音符到当前 MIDI 轨道。
 
-## 多机同步
+## 换机设置
 
-每台机器首次 clone 后需要：
+在新电脑上首次 clone 后需要：
 
 1. `npm install`（SDK 通过本地 tgz 安装，确保 `~/Downloads/` 下有对应的 SDK 文件）
 2. 复制 `.env.example` → `.env`，填入本机 Live Beta 路径

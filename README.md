@@ -6,7 +6,7 @@ Ableton Live 12 扩展工具集。
 
 - **Node.js >= 24.14**（推荐 [fnm](https://github.com/Schniz/fnm) 管理版本）
 - **Ableton Live 12 Beta**（Developer Mode 已开启：Preferences → Extensions）
-- **Ableton Extensions SDK**（[下载](https://www.ableton.com/en/developer/)）
+- **Ableton Extensions SDK**
 - Windows / macOS
 
 ## 快速开始
